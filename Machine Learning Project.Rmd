@@ -1,0 +1,120 @@
+---
+title: "Machine Learning Prject"
+author: "Peter Wang"
+date: "Wednesday, February 18, 2015"
+output: html_document
+---
+
+---
+
+---
+
+##I. Summary
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+---
+
+---
+
+##II. Preparation
+Load required libary, in this project, we need caret and randomForest.
+```{r}
+#load library
+library(caret)
+library(randomForest)
+library(kernlab)
+```
+
+Load the data from local drive, note the file has to be under same directory as this rmd file.
+```{r cache=TRUE}
+#download and load file
+data_train<-read.csv("pml-training.csv",na.strings= c("NA",""," "),header=TRUE)
+```
+
+---
+
+##III. Clean up train data
+
+Check the column counts(features count), and realize there are too many columns, in order to make the random forest prediction efficient, we need to control the `amount of features under 53`.
+```{r}
+ncol(data_train)
+```
+
+We need to reduce the column first by checking the 'NA's in the data, the `columns that contain NA` will be collected to a list, then the list will be used to filter out the columns that 'don't' contain NA.
+```{r}
+#clean up the 'NA's in original 'training' file
+#get a boolean list that indicates if there's no 'NA' exists in the column
+data_train_na_list<-apply(data_train,2,function(x){!any(is.na(x))})
+#clean up the data that keeps columns that don't have 'NA'
+data_train_clean<-data_train[,data_train_na_list]
+```
+
+The first few column in the data such as name, time stap and window should not be used for prediction, therefore we only save from `8th column` to the `last column`.
+```{r}
+#remove the first few that're irrelevent
+data_train_clean<-data_train_clean[,8:ncol(data_train_clean)]
+```
+
+---
+
+##IV. Set up machine learning
+
+Seperate clean train data into training dataset and validation dataset, the 'ratio is 7:3'. and 'list' should be set to FALSE.
+```{r}
+#seperate training set into training set and validataion
+set.seed(12345)
+train_row<-createDataPartition(y=data_train_clean$classe,p=0.7,list=FALSE)
+final_data_training<-data_train_clean[train_row,]
+final_data_validation<-data_train_clean[-train_row,]
+```
+
+Since `accurary` is the main goal that we want to achieve comparing to factors like speed. so I pick `random forest` as the prediciton model.
+
+Fit a random forest model, all the features should be used to get a better train model.
+```{r}
+train_model<-randomForest(classe ~.,data=final_data_training)
+```
+
+The train model has a `OOB estimate of error rate of 0.5%`, which should be low enough for us to proceed for the actual cross validation testing.
+```{r echo=FALSE}
+train_model
+```
+
+Use that train model to run the prediction on the validation data that was previous created in the last section.
+```{r}
+#apply the second set from training set to validate
+validate_model<-predict(train_model,final_data_validation)
+```
+
+The result is shown by combining known 'classe' and results from validation results.
+```{r}
+#use cross validation
+confusionMatrix(final_data_validation$classe, validate_model)
+```
+
+The model generates a `0.993 (99.3%) of accuracy` on the cross validation data set, it also has over `99% across all the classes in both sensitivity and specificity`.
+
+
+---
+
+##V. Set up prediction for the test data.
+
+Follow the same procedures as we did in section I to clean up the test data.
+```{r cache=TRUE}
+#clean up the 'NA's in original 'testing' file
+data_test<-read.csv("pml-testing.csv",na.strings= c("NA",""," "),header=TRUE)
+data_test_na_list<-apply(data_test,2,function(x){!any(is.na(x))})
+data_test_clean<-data_test[,data_test_na_list]
+data_test_clean<-data_test_clean[,8:ncol(data_test_clean)]
+```
+
+---
+
+##VI. Conclusion
+
+Use the prediction model on the `20 test sets` to get the prediction.
+```{r}
+#test on testing set
+predict(train_model,data_test_clean)
+```
+
